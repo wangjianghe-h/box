@@ -240,6 +240,8 @@ ON CONFLICT(id) DO UPDATE SET
 
 func syncNetwork(tx *sql.Tx, cfg *config) error {
 	listMode := normalizeChoice(cfg.get("use_wifi_list_mode", "blacklist"), "blacklist", "blacklist", "whitelist")
+	matchedAction := actionFor(cfg.boolean("use_module_on_wifi", true))
+	unmatchedAction := actionFor(cfg.boolean("use_module_on_wifi_disconnect", true))
 	_, err := tx.Exec(`
 INSERT INTO network_match_settings (
     id, network_control_enabled, use_on_wifi_disconnect, use_on_wifi_connect,
@@ -247,17 +249,21 @@ INSERT INTO network_match_settings (
     enable_ssid_matching, enable_network_control_log, list_mode,
     switch_config, matched_config_name, unmatched_config_name,
     matched_script_name, unmatched_script_name
-) VALUES (1, ?, ?, ?, 1, 1, 'enable', 'stop', ?, ?, ?, 0, '', '', '', '')
+) VALUES (1, ?, ?, ?, 1, 1, ?, ?, ?, ?, ?, 0, '', '', '', '')
 ON CONFLICT(id) DO UPDATE SET
     network_control_enabled = excluded.network_control_enabled,
     use_on_wifi_disconnect = excluded.use_on_wifi_disconnect,
     use_on_wifi_connect = excluded.use_on_wifi_connect,
+    matched_action = excluded.matched_action,
+    unmatched_action = excluded.unmatched_action,
     enable_ssid_matching = excluded.enable_ssid_matching,
     enable_network_control_log = excluded.enable_network_control_log,
     list_mode = excluded.list_mode`,
 		boolInt(cfg.boolean("enable_network_service_control", false)),
 		boolInt(cfg.boolean("use_module_on_wifi_disconnect", true)),
 		boolInt(cfg.boolean("use_module_on_wifi", true)),
+		matchedAction,
+		unmatchedAction,
 		boolInt(cfg.boolean("use_ssid_matching", false)),
 		boolInt(cfg.boolean("inotify_log_enabled", true)),
 		listMode,
@@ -266,6 +272,13 @@ ON CONFLICT(id) DO UPDATE SET
 		return fmt.Errorf("sync network_match_settings: %w", err)
 	}
 	return nil
+}
+
+func actionFor(enabled bool) string {
+	if enabled {
+		return "enable"
+	}
+	return "stop"
 }
 
 func syncShared(tx *sql.Tx, cfg *config, home string) error {
