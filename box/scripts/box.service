@@ -67,8 +67,6 @@ pick_core() {
 run_boxctl() {
   cmd="$1"
   set -- --home "${box_dir}" --db "${box_db}"
-  [ -n "${tproxy_port}" ] && set -- "$@" --tproxy-port "${tproxy_port}"
-  [ -n "${redir_port}" ] && set -- "$@" --redir-port "${redir_port}"
   if [ -n "${CORE}" ] && [ -n "${CORE_CFG}" ]; then
     set -- "$@" --core "${CORE}" --config "${CORE_CFG}"
   fi

@@ -305,12 +305,10 @@ INSERT OR IGNORE INTO shared_network_interface_settings (id, initialized) VALUES
 	if len(allowIfaces) == 0 && ifaceCount == 0 {
 		allowIfaces = defaultSharedInterfaces
 	}
-	if len(allowIfaces) > 0 {
-		if err := replaceStrings(tx, "shared_network_interfaces", "value", allowIfaces); err != nil {
-			return err
-		}
+	if err := replaceStrings(tx, "shared_network_interfaces", "value", expandInterfaces(allowIfaces)); err != nil {
+		return err
 	}
-	if err := replaceStrings(tx, "blocked_interfaces", "value", ignoreIfaces); err != nil {
+	if err := replaceStrings(tx, "blocked_interfaces", "value", expandInterfaces(ignoreIfaces)); err != nil {
 		return err
 	}
 	if _, err := tx.Exec(`
@@ -446,4 +444,35 @@ func boolInt(value bool) int {
 		return 1
 	}
 	return 0
+}
+
+func expandInterfaces(patterns []string) []string {
+	entries, err := os.ReadDir("/sys/class/net")
+	if err != nil {
+		return patterns
+	}
+	names := make([]string, 0, len(entries))
+	for _, entry := range entries {
+		names = append(names, entry.Name())
+	}
+	out := make([]string, 0, len(patterns))
+	seen := map[string]bool{}
+	for _, pattern := range patterns {
+		wildcard := strings.HasSuffix(pattern, "+")
+		prefix := strings.TrimSuffix(pattern, "+")
+		for _, name := range names {
+			if wildcard {
+				if !strings.HasPrefix(name, prefix) {
+					continue
+				}
+			} else if name != pattern {
+				continue
+			}
+			if !seen[name] {
+				seen[name] = true
+				out = append(out, name)
+			}
+		}
+	}
+	return out
 }

@@ -45,15 +45,11 @@ case "$1" in
       exit 0
     }
     set -- --home "${box_dir}" --db "${box_db}"
-    [ -n "${tproxy_port}" ] && set -- "$@" --tproxy-port "${tproxy_port}"
-    [ -n "${redir_port}" ] && set -- "$@" --redir-port "${redir_port}"
     "${boxctl}" "$@" mode apply
     ;;
   renew)
     sync_db || exit 1
     set -- --home "${box_dir}" --db "${box_db}"
-    [ -n "${tproxy_port}" ] && set -- "$@" --tproxy-port "${tproxy_port}"
-    [ -n "${redir_port}" ] && set -- "$@" --redir-port "${redir_port}"
     "${boxctl}" "$@" mode renew
     ;;
   disable)
