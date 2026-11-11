@@ -18,6 +18,16 @@ elif [ "$KSU" = true ] && [ "$KSU_VER_CODE" -lt 10670 ]; then
   abort "-----------------------------------------------------------"
 fi
 
+case "$(getprop ro.product.cpu.abi)" in
+  arm64-v8a) ;;
+  *)
+    abort "-----------------------------------------------------------"
+    ui_print "! 本模块内置 App 版 boxctl/boxbpf arm64 运行时"
+    ui_print "! 仅支持 arm64-v8a 设备"
+    abort "-----------------------------------------------------------"
+    ;;
+esac
+
 service_dir="/data/adb/service.d"
 if [ "$KSU" = "true" ]; then
   ui_print "- 检测到 KernelSU 版本: $KSU_VER ($KSU_VER_CODE)"
@@ -62,6 +72,9 @@ set_perm_recursive /data/adb/box/scripts/ 0 3005 0755 0700
 set_perm ${service_dir}/box_service.sh 0 0 0755
 set_perm $MODPATH/uninstall.sh 0 0 0755
 chmod ugo+x ${service_dir}/box_service.sh $MODPATH/uninstall.sh /data/adb/box/scripts/*
+for tool in boxctl boxbpf boxdb; do
+  [ -f "/data/adb/box/bin/${tool}" ] && set_perm "/data/adb/box/bin/${tool}" 0 0 0755
+done
 
 KEY_LISTENER_PID=""
 KEY_FIFO=""
@@ -305,6 +318,12 @@ if [ "${backup_box}" = "true" ]; then
     fi
   done
 
+  for db_file in box.db box.db-wal box.db-shm; do
+    if [ -f "${temp_dir}/${db_file}" ]; then
+      cp -f "${temp_dir}/${db_file}" "/data/adb/box/${db_file}"
+    fi
+  done
+
   restore_binary() {
     local bin_path_fragment="$1"
     local target_path="/data/adb/box/bin/${bin_path_fragment}"
@@ -327,7 +346,20 @@ if [ "${backup_box}" = "true" ]; then
   fi
 fi
 
-[ -z "$(find /data/adb/box/bin -type f -name '*' ! -name '*.bak')" ] && sed -Ei 's/^description=(\[.*][[:space:]]*)?/description=[ 😱 模块已安装但需手动下载内核 ] /g' $MODPATH/module.prop
+has_core="false"
+for core_bin in mihomo sing-box xray v2fly hysteria; do
+  [ -f "/data/adb/box/bin/${core_bin}" ] && has_core="true"
+done
+[ "${has_core}" = "false" ] && sed -Ei 's/^description=(\[.*][[:space:]]*)?/description=[ 😱 模块已安装但需手动下载内核 ] /g' $MODPATH/module.prop
+
+if [ -x "/data/adb/box/bin/boxdb" ]; then
+  ui_print "- 初始化 App 运行数据库 box.db"
+  if /data/adb/box/bin/boxdb sync --home /data/adb/box >> "/data/adb/box/run/runs.log" 2>&1; then
+    ui_print "- box.db 初始化完成"
+  else
+    ui_print "! box.db 初始化失败，将在开机时重试"
+  fi
+fi
 
 if [ "$KSU" = "true" ]; then
   sed -i "s/name=.*/name=Box for KernelSU/g" $MODPATH/module.prop

@@ -142,26 +142,9 @@ reload_cnip_set() {
 }
 
 reload_cnip_sets_after_update() {
-  local updated_v4="$1"
-  local updated_v6="$2"
-  local ok="true"
-
   [ "${bypass_cn_ip}" = "true" ] || return 0
   is_box_running || return 0
-
-  if [ "${updated_v4}" = "true" ] || [ "${updated_v6}" = "true" ]; then
-    log Info "服务运行中且已启用 CNIP，正在重写入 ipset"
-  fi
-
-  if [ "${updated_v4}" = "true" ]; then
-    reload_cnip_set cnip inet "${cn_ip_file}" || ok="false"
-  fi
-
-  if [ "${updated_v6}" = "true" ]; then
-    reload_cnip_set cnip6 inet6 "${cn_ipv6_file}" || ok="false"
-  fi
-
-  [ "${ok}" = "true" ]
+  "${scripts_dir}/box.iptables" renew
 }
 
 upcnip() {
